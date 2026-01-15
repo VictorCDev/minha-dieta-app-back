@@ -11,15 +11,16 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import com.minhadieta.dietaapi.dto.LoginRequest; // Importação adicionada
-import com.minhadieta.dietaapi.dto.AuthResponse; // Importação adicionada
-import com.minhadieta.dietaapi.security.JwtUtil; // Importação adicionada
-import org.springframework.security.core.userdetails.UserDetailsService; // Importação adicionada
-import org.springframework.security.core.userdetails.UsernameNotFoundException; // Importação adicionada
-import org.springframework.security.authentication.AuthenticationManager; // Importação adicionada
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken; // Importação adicionada
-import org.springframework.security.core.Authentication; // Importação adicionada
-import org.springframework.security.core.context.SecurityContextHolder; // Importação adicionada
+import com.minhadieta.dietaapi.dto.LoginRequest;
+import com.minhadieta.dietaapi.dto.AuthResponse;
+import com.minhadieta.dietaapi.security.JwtUtil;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.context.annotation.Lazy;
 
 
 import java.time.LocalDateTime;
@@ -38,7 +39,7 @@ public class UserService implements UserDetailsService {
 
     @Autowired
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                       JwtUtil jwtUtil, AuthenticationManager authenticationManager) {
+                       JwtUtil jwtUtil,@Lazy AuthenticationManager authenticationManager) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
@@ -47,15 +48,15 @@ public class UserService implements UserDetailsService {
 
     // Implementação do método loadUserByUsername da interface UserDetailsService
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        AppUser user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado com o nome: " + username));
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        AppUser user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado com o email: " + email));
 
         //Converte a string de 'role' em uma coleção de GrantedAuthority
         Collection<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(user.getRole()));
 
         // Retorna um objeto User do Spring Security com as roles/authorities
-        return new User(user.getUsername(), user.getPasswordHash(), authorities);
+        return new User(user.getEmail(), user.getPasswordHash(), authorities);
     }
 
     @Transactional
@@ -136,7 +137,7 @@ public class UserService implements UserDetailsService {
         try {
             // Tenta autenticar o usuário com o AuthenticationManager
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
+                    new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword())
             );
 
             // Se a autenticação for bem-sucedida, define-a no SecurityContext
@@ -144,7 +145,7 @@ public class UserService implements UserDetailsService {
 
             // Carrega os detalhes completos do usuário para gerar o JWT e a resposta
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            AppUser loggedInUser = userRepository.findByUsername(userDetails.getUsername())
+            AppUser loggedInUser = userRepository.findByEmail(userDetails.getUsername())
                     .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado após autenticação."));
 
             // Gera o token JWT

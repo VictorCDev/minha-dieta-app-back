@@ -35,5 +35,17 @@ services:
       db:
         condition: service_healthy # AGORA FUNCIONARÁ, POIS 'db' TEM UM HEALTHCHECK
 
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: dieta-ngrok
+    restart: unless-stopped
+    command: http backend:8080 # Aponta para o nome do serviço 'backend'
+    environment:
+      NGROK_AUTHTOKEN: 38GYMWCeqX36D0VNzAhJiWU4mVn_nLsBMT5nFjHH99gEEcGA # <--- Cole seu token aqui
+    ports:
+      - "4040:4040" # Interface visual do ngrok para ver o link
+    depends_on:
+      - backend
+
 volumes:
   db_data: # Define o volume nomeado para persistência dos dados
