@@ -1,5 +1,5 @@
 # Usa uma imagem base oficial do OpenJDK para Java 24
-FROM openjdk:24-jdk
+FROM eclipse-temurin:24-jdk
 
 # Define o diretório de trabalho dentro do contêiner
 WORKDIR /app
@@ -12,4 +12,4 @@ COPY target/*.jar app.jar
 EXPOSE 8080
 
 # Comando para rodar a aplicação quando o contêiner for iniciado
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
