@@ -2,12 +2,14 @@ package com.minhadieta.dietaapi.service;
 
 import com.minhadieta.dietaapi.dto.MealItemRequest;
 import com.minhadieta.dietaapi.dto.MealItemResponse;
+import com.minhadieta.dietaapi.model.AppUser;
 import com.minhadieta.dietaapi.model.Ingredient;
 import com.minhadieta.dietaapi.model.MealConfiguration;
 import com.minhadieta.dietaapi.model.MealItem;
 import com.minhadieta.dietaapi.repository.IngredientRepository;
 import com.minhadieta.dietaapi.repository.MealConfigurationRepository;
 import com.minhadieta.dietaapi.repository.MealItemRepository;
+import com.minhadieta.dietaapi.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,16 +29,17 @@ public class MealItemService {
     @Autowired
     private IngredientRepository ingredientRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Transactional
     public MealItemResponse create(Long userId, Long dietProfileId, Long mealId, MealItemRequest request) {
-        // 1. Valida a posse e busca a refeição
-        MealConfiguration mealConfig = findMealConfigForUser(userId, dietProfileId, mealId);
+        // Ignoramos dietProfileId por enquanto no MVP
+        MealConfiguration mealConfig = findMealConfigForUser(userId, mealId);
 
-        // 2. Busca o ingrediente
         Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
                 .orElseThrow(() -> new IllegalArgumentException("Ingrediente com ID " + request.getIngredientId() + " não encontrado."));
 
-        // 3. Cria e salva o novo item da refeição
         MealItem newMealItem = new MealItem();
         newMealItem.setMealConfiguration(mealConfig);
         newMealItem.setIngredient(ingredient);
@@ -47,10 +50,9 @@ public class MealItemService {
         return convertToResponse(savedItem);
     }
 
-
     @Transactional(readOnly = true)
     public List<MealItemResponse> findAllByMeal(Long userId, Long dietProfileId, Long mealId) {
-        MealConfiguration mealConfig = findMealConfigForUser(userId, dietProfileId, mealId);
+        MealConfiguration mealConfig = findMealConfigForUser(userId, mealId);
         return mealConfig.getMealItems().stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
@@ -58,7 +60,7 @@ public class MealItemService {
 
     @Transactional
     public MealItemResponse update(Long userId, Long dietProfileId, Long mealId, Long itemId, MealItemRequest request) {
-        findMealConfigForUser(userId, dietProfileId, mealId); // Apenas para validação de segurança
+        findMealConfigForUser(userId, mealId); // Validação de segurança
 
         MealItem mealItem = mealItemRepository.findByIdAndMealConfiguration_Id(itemId, mealId)
                 .orElseThrow(() -> new IllegalArgumentException("Item de refeição não encontrado ou não pertence a esta refeição."));
@@ -76,7 +78,7 @@ public class MealItemService {
 
     @Transactional
     public void delete(Long userId, Long dietProfileId, Long mealId, Long itemId) {
-        findMealConfigForUser(userId, dietProfileId, mealId); // Validação de segurança
+        findMealConfigForUser(userId, mealId); // Validação de segurança
 
         MealItem mealItem = mealItemRepository.findByIdAndMealConfiguration_Id(itemId, mealId)
                 .orElseThrow(() -> new IllegalArgumentException("Item de refeição não encontrado ou não pertence a esta refeição."));
@@ -84,19 +86,18 @@ public class MealItemService {
         mealItemRepository.delete(mealItem);
     }
 
-
     /**
-     * Método auxiliar de segurança: Busca uma MealConfiguration pelo seu ID, mas garante
-     * que ela pertence ao DietProfile e ao User especificados.
+     * Método auxiliar corrigido: Busca a refeição e garante que pertence ao Usuário.
+     * Removemos a dependência do DietProfile.
      */
-    private MealConfiguration findMealConfigForUser(Long userId, Long dietProfileId, Long mealId) {
-        return mealConfigurationRepository.findByIdAndDietProfile_IdAndDietProfile_User_Id(mealId, dietProfileId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Refeição não encontrada ou não pertence ao perfil/usuário especificado."));
+    private MealConfiguration findMealConfigForUser(Long userId, Long mealId) {
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
+
+        return mealConfigurationRepository.findByIdAndUser(mealId, user)
+                .orElseThrow(() -> new IllegalArgumentException("Refeição não encontrada ou não pertence ao usuário especificado."));
     }
 
-    /**
-     * Método auxiliar para converter a entidade MealItem para o DTO de resposta.
-     */
     private MealItemResponse convertToResponse(MealItem mealItem) {
         return new MealItemResponse(
                 mealItem.getId(),
